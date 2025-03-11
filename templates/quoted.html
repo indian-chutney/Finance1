@@ -1,0 +1,21 @@
+{% extends "quote.html" %}
+
+{% block main %}
+    {{ super() }}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td> {{ stocks['symbol'] }} </td>
+                <td> {{ stocks['price'] | usd }} </td>
+            </tr>
+        </tbody>
+    </table>
+
+{% endblock %}

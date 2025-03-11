@@ -1,0 +1,40 @@
+{% extends 'layout.html' %}
+
+{% block title %}
+    Home
+{% endblock %}
+
+{% block main %}
+    <table>
+        <thead>
+            <tr>
+                <th>Stock Bought</th>
+                <th>Number of stocks</th>
+                <th>Stock Value</th>
+                <th>Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stock_owned in stocks_owned %}
+                <tr>
+                    <td>{{ stock_owned["stock"] }}</td>
+                    <td>{{ stock_owned["number of stocks"] }}</td>
+                    <td>{{ stock_owned["price"] | usd }}</td>
+                    <td>{{ stock_owned["total"] | usd }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2"></td>
+                <td class="fw-bold">Cash</td>
+                <td>{{ Cash | usd }}</td>
+            </tr>
+            <tr>
+                <td colspan="2"></td>
+                <td class = "fw-bold">Total</t>
+                <td>{{ Total | usd }}</td>
+            </tr>
+        </tfoot>
+    </table>
+{% endblock %}

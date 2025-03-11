@@ -1,0 +1,68 @@
+/* background colors */
+body {
+    background-color: #121212;
+    color: white;
+}
+
+
+/* header for page */
+nav {
+    background-color: #1a1a1a;
+}
+
+nav .navbar-brand {
+    font-size: xx-large;
+    color: #00acc2;
+}
+
+.navbar-brand:hover {
+    color: #00acc2;
+}
+
+.navbar-nav {
+    --bs-nav-link-color: grey;
+    --bs-nav-link-hover-color: #00acc2;;
+}
+
+
+/* input form */
+.form-control {
+    background-color: #302c2c;
+    border: none;
+    color: white;
+}
+
+.form-control:focus {
+    background-color: #302c2c;
+    color: white;
+    border-color: white;
+    outline: 0;
+    box-shadow: 0 0 0 0.1rem rgb(254, 254, 254);
+}
+
+/* buttons */
+.btn {
+    color: grey;
+    background-color: var(--bs-btn-hover-bg);
+    border-color: var(--bs-btn-hover-border-color);
+}
+.btn:hover {
+    background-color: #00acc2;
+    color: white;
+}
+
+table {
+    background-color: transparent;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+
+table th,
+table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+}
+
+tbody tr:nth-of-type(odd) {
+    background-color: rgb(179, 208, 255, 0.3)
+}

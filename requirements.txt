@@ -3,3 +3,8 @@ Flask
 Flask-Session
 pytz
 requests
+plotly
+werkzeug.security
+pandas
+os
+dotenv

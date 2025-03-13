@@ -2,10 +2,9 @@ import os
 import requests
 import pandas as pd
 import plotly.graph_objects as go
-import requests
 
 from dotenv import load_dotenv
-from flask import redirect, render_template, request, session
+from flask import redirect, render_template, session
 from functools import wraps
 
 

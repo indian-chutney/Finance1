@@ -39,6 +39,25 @@ nav .navbar-brand {
     box-shadow: 0 0 0 0.1rem rgb(254, 254, 254);
 }
 
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.7); 
+}
+
+/* option bar */
+.form-select {
+    background-color: #302c2c;
+    border: none;
+    color: rgba(255, 255, 255, 0.7); 
+}
+
+.form-select:focus {
+    background-color: #302c2c;
+    color: white;
+    border-color: white;
+    outline: 0;
+    box-shadow: 0 0 0 0.1rem rgb(254, 254, 254);
+}
+
 /* buttons */
 .btn {
     color: grey;

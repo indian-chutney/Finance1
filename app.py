@@ -1,5 +1,3 @@
-import os
-
 from cs50 import SQL
 from flask import Flask, flash, redirect, render_template, request, session
 from flask_session import Session
@@ -65,7 +63,6 @@ def index():
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
-    """Buy shares of stock"""
     if request.method == "POST":
         if not request.form.get("symbol"):
             return apology("provide a symbol", 400)
@@ -116,7 +113,7 @@ def buy():
 @app.route("/history")
 @login_required
 def history():
-    """Show history of transactions"""
+
     table = db.execute(
         "SELECT stock_name, no_of_stocks, price, time FROM transactions WHERE id = ?", session["user_id"])
     n = len(table)
@@ -178,7 +175,6 @@ def login():
 
 @app.route("/logout")
 def logout():
-    """Log user out"""
 
     # Forget any user_id
     session.clear()
@@ -199,9 +195,10 @@ def quote():
             return apology("provide a symbol", 400)
         symbol = request.form.get("symbol")
         stocks = lookup(symbol)
+        fig = stocks[1].to_html(full_html=False)
         if not stocks:
             return apology("invalid symbol", 400)
-        return render_template("quoted.html", stocks=stocks)
+        return render_template("quoted.html", stocks=stocks[0], fig = fig)
     else:
         return render_template("quote.html")
 

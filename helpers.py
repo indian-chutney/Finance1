@@ -1,23 +1,19 @@
-import csv
-import datetime
-import pytz
+import os
 import requests
-import urllib
-import uuid
+import pandas as pd
+import plotly.graph_objects as go
+import requests
 
+from dotenv import load_dotenv
 from flask import redirect, render_template, request, session
 from functools import wraps
 
 
 def apology(message, code=400):
-    """Render message as an apology to user."""
 
     def escape(s):
-        """
-        Escape special characters.
+    # reference -> https://github.com/jacebrowning/memegen#special-characters
 
-        https://github.com/jacebrowning/memegen#special-characters
-        """
         for old, new in [
             ("-", "--"),
             (" ", "-"),
@@ -35,11 +31,8 @@ def apology(message, code=400):
 
 
 def login_required(f):
-    """
-    Decorate routes to require login.
 
-    https://flask.palletsprojects.com/en/latest/patterns/viewdecorators/
-    """
+    # referece -> https://flask.palletsprojects.com/en/latest/patterns/viewdecorators/
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -51,37 +44,58 @@ def login_required(f):
 
 
 def lookup(symbol):
-    """Look up quote for symbol."""
 
-    # Prepare API request
+    load_dotenv()
+
     symbol = symbol.upper()
-    end = datetime.datetime.now(pytz.timezone("US/Eastern"))
-    start = end - datetime.timedelta(days=7)
 
-    # Yahoo Finance API
     url = (
-        f"https://query1.finance.yahoo.com/v7/finance/download/{urllib.parse.quote_plus(symbol)}"
-        f"?period1={int(start.timestamp())}"
-        f"&period2={int(end.timestamp())}"
-        f"&interval=1d&events=history&includeAdjustedClose=true"
+        f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={os.getenv("lookup_api_key")}"
     )
 
     # Query API
     try:
-        response = requests.get(
-            url,
-            cookies={"session": str(uuid.uuid4())},
-            headers={"Accept": "*/*", "User-Agent": request.headers.get("User-Agent")},
-        )
+        response = requests.get(url)
         response.raise_for_status()
 
-        # CSV header: Date,Open,High,Low,Close,Adj Close,Volume
-        quotes = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
-        price = round(float(quotes[-1]["Adj Close"]), 2)
-        return {"price": price, "symbol": symbol}
+        data = response.json()
+
+        price = round(float(data["Global Quote"]["05. price"]), 2)
+        stock_val = {"price": price, "symbol": symbol}
+        fig = display_candlestick('slider', symbol)
+
+        return [stock_val, fig]
+
     except (KeyError, IndexError, requests.RequestException, ValueError):
         return None
 
+
+# reference -> https://plotly.com/python/candlestick-charts/
+def display_candlestick(value, symbol):
+    try:
+        response = requests.get(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=compact&apikey={os.getenv("lookup_api_key")}")
+        response.raise_for_status()
+
+        data = response.json()
+        df = pd.DataFrame(data['Time Series (Daily)']).T
+        df.index = pd.to_datetime(df.index)
+        df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+    except (KeyError, IndexError, requests.RequestException, ValueError):
+        return None
+
+    fig = go.Figure(go.Candlestick(
+        x=df.index,
+        open=df['Open'],
+        high=df['High'],
+        low=df['Low'],
+        close=df['Close']
+    ))
+
+    fig.update_layout(
+        xaxis_rangeslider_visible='slider' in value
+    )
+
+    return fig
 
 def usd(value):
     """Format value as USD."""

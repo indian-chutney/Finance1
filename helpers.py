@@ -71,7 +71,7 @@ def lookup(symbol):
 # reference -> https://plotly.com/python/candlestick-charts/
 def display_candlestick(value, symbol):
     try:
-        response = requests.get(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=compact&apikey={os.getenv('lookup_api_key')}")
+        response = requests.get(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=compact&apikey=C5S6C4ETI117KFZR")
         response.raise_for_status()
 
         data = response.json()
@@ -81,8 +81,11 @@ def display_candlestick(value, symbol):
         df = pl.DataFrame(raw_df).transpose(include_header=True)  # Transpose to get the correct format
         
         # Rename columns and parse index as datetime
-        df = df.rename({"column_0": "date", "column_1": "Open", "column_2": "High", 
-                        "column_3": "Low", "column_4": "Close", "column_5": "Volume"})
+        df = pl.DataFrame(
+            [(date, *values.values()) for date, values in raw_df.items()],
+            schema=["date", "Open", "High", "Low", "Close", "Volume"],
+            orient="row"  # Explicitly setting row orientation
+        )
         
         # Convert date column to datetime
         df = df.with_columns(pl.col("date").str.to_datetime())

@@ -18,14 +18,18 @@ app.jinja_env.filters["usd"] = usd
 
 load_dotenv()
 
-# Configure session to use filesystem (instead of signed cookies)
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
-
 # Connecting MongoDb database
 client = MongoClient(os.getenv("mongodb_conn_str"))
 db = client.finance
+
+# Configure session to use mongodb (instead of signed cookies)
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "mongodb"
+app.config["SESSION_MONGODB"] = client
+app.config["SESSION_MONGODB_DB"] = "sessions"
+app.config["SESSION_MONGODB_COLLECT"] = "sessions"
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+Session(app)
 
 @app.after_request
 def after_request(response):

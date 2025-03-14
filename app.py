@@ -179,7 +179,7 @@ def login():
             return apology("invalid username and/or password", 400)
 
         # Remember which user has logged in
-        session["user_id"] = user["_id"]
+        session["user_id"] = str(user["_id"])
 
         flash("Logged in successfully!", "success")
 
@@ -256,7 +256,7 @@ def register():
         })
 
         user = db.users.find_one({"username" : username})
-        session["user_id"] = user["_id"]
+        session["user_id"] = str(user["_id"])
 
         flash("Registered successfully!", "success")
 

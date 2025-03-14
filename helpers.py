@@ -49,7 +49,7 @@ def lookup(symbol):
     symbol = symbol.upper()
 
     url = (
-        f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={os.getenv("lookup_api_key")}"
+        f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={os.getenv('lookup_api_key')}"
     )
 
     # Query API

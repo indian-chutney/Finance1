@@ -1,5 +1,7 @@
 import sqlite3
+import os
 from flask import Flask, flash, redirect, render_template, request, session
+from dotenv import load_dotenv
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -11,14 +13,13 @@ app = Flask(__name__)
 # Custom filter
 app.jinja_env.filters["usd"] = usd
 
-# Configure session to use filesystem (instead of signed cookies)
-app.config["SESSION_TYPE"] = "securecookie"
+load_dotenv()
+
+app.config["SECRET_KEY"] = os.getenv("cookie_key")
+app.config["SESSION_TYPE"] = "cookie"  
+app.config["SESSION_PERMANENT"] = False
+
 Session(app)
-
-# Connect to SQLite database
-conn = sqlite3.connect("finance.db", check_same_thread=False)
-cursor = conn.cursor()
-
 
 @app.after_request
 def after_request(response):
@@ -33,6 +34,8 @@ def after_request(response):
 @login_required
 def index():
     """Show portfolio of stocks"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     user_id = session["user_id"]
     cursor.execute("SELECT stock_name, no_of_stocks FROM stocks_owned WHERE id = ?", (user_id,))
@@ -40,6 +43,7 @@ def index():
 
     cursor.execute("SELECT cash FROM users WHERE id = ?", (session["user_id"],))
     cash = cursor.fetchone()
+    conn.close()
 
     if not table:
         return render_template("index.html", stocks_owned=[], Cash=cash[0], Total=cash[0])
@@ -65,6 +69,8 @@ def index():
 @login_required
 def buy():
     if request.method == "POST":
+        conn = get_db_connection()
+        cursor = conn.cursor()
         if not request.form.get("symbol"):
             return apology("provide a symbol", 400)
 
@@ -100,6 +106,7 @@ def buy():
         conn.commit()
 
         flash("Stock Bought successfully!", "success")
+        conn.close()
 
         return redirect("/")
 
@@ -110,6 +117,8 @@ def buy():
 @app.route("/history")
 @login_required
 def history():
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     cursor.execute("SELECT stock_name, no_of_stocks, price, time FROM transactions WHERE id = ?", (session["user_id"],))
     table = cursor.fetchall()
@@ -120,6 +129,8 @@ def history():
         "price": row[2],
         "time": row[3]
     } for row in table]
+
+    conn.close()
 
     return render_template("history.html", transactions=transactions)
 
@@ -142,6 +153,8 @@ def login():
             return apology("must provide password", 400)
 
         # Query database for username
+        conn = get_db_connection()
+        cursor = conn.cursor()
         username = request.form.get("username")
         cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
         row = cursor.fetchone()
@@ -154,6 +167,7 @@ def login():
         session["user_id"] = row[0]
 
         flash("Logged in successfully!", "success")
+        conn.close()
 
         # Redirect user to home page
         return redirect("/")
@@ -205,6 +219,8 @@ def register():
         if not request.form.get("password"):
             return apology("must provide password", 400)
 
+        conn = get_db_connection()
+        cursor = conn.cursor()
         # ensuring if same username exists or not
         username = request.form.get("username")
         cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
@@ -228,6 +244,7 @@ def register():
         session["user_id"] = cursor.fetchone()[0]
 
         flash("Registered successfully!", "success")
+        conn.close()
 
         return redirect("/")
 
@@ -243,6 +260,9 @@ def sell():
         stock = request.form.get("symbol")
         number = int(request.form.get("shares"))
 
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
         cursor.execute("SELECT no_of_stocks FROM stocks_owned WHERE stock_name = ? AND id = ?", (stock, session["user_id"]))
         row = cursor.fetchone()
 
@@ -256,6 +276,8 @@ def sell():
         conn.commit()
 
         flash("Stocks sold successfully!", "success")
+
+        conn.close()
 
         return redirect("/")
     else:
@@ -276,6 +298,9 @@ def change_password():
 
         if not password or not new_password or not confirmation:
             return apology("enter the password/passwords", 400)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
         cursor.execute("SELECT hash FROM users WHERE id = ?", (session["user_id"],))
         pass_hash = cursor.fetchone()
@@ -292,7 +317,15 @@ def change_password():
 
         flash("Password updated successfully!", "success")
 
+        conn.close()
+
         return redirect("/")
 
     else:
         return render_template("change.html")
+
+
+def get_db_connection():
+    conn = sqlite3.connect("finance.db")
+    conn.row_factory = sqlite3.Row
+    return conn

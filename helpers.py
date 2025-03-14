@@ -1,6 +1,6 @@
 import os
 import requests
-import pandas as pd
+import polars as pl
 import plotly.graph_objects as go
 
 from dotenv import load_dotenv
@@ -71,22 +71,32 @@ def lookup(symbol):
 # reference -> https://plotly.com/python/candlestick-charts/
 def display_candlestick(value, symbol):
     try:
-        response = requests.get(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=compact&apikey={os.getenv("lookup_api_key")}")
+        response = requests.get(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=compact&apikey={os.getenv('lookup_api_key')}")
         response.raise_for_status()
 
         data = response.json()
-        df = pd.DataFrame(data['Time Series (Daily)']).T
-        df.index = pd.to_datetime(df.index)
-        df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        raw_df = data.get('Time Series (Daily)', {})
+
+        # Convert JSON to Polars DataFrame
+        df = pl.DataFrame(raw_df).transpose(include_header=True)  # Transpose to get the correct format
+        
+        # Rename columns and parse index as datetime
+        df = df.rename({"column_0": "date", "column_1": "Open", "column_2": "High", 
+                        "column_3": "Low", "column_4": "Close", "column_5": "Volume"})
+        
+        # Convert date column to datetime
+        df = df.with_columns(pl.col("date").str.to_datetime())
+
     except (KeyError, IndexError, requests.RequestException, ValueError):
         return None
 
+    # Convert polars DataFrame to dictionary for Plotly
     fig = go.Figure(go.Candlestick(
-        x=df.index,
-        open=df['Open'],
-        high=df['High'],
-        low=df['Low'],
-        close=df['Close']
+        x=df["date"].to_list(),
+        open=df["Open"].to_list(),
+        high=df["High"].to_list(),
+        low=df["Low"].to_list(),
+        close=df["Close"].to_list()
     ))
 
     fig.update_layout(

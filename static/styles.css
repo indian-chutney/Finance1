@@ -29,6 +29,7 @@ nav .navbar-brand {
 .form-control {
     background-color: #302c2c;
     border: none;
+    color: white;
 }
 
 .form-control:focus {

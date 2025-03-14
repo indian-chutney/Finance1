@@ -61,9 +61,8 @@ def lookup(symbol):
 
         price = round(float(data["Global Quote"]["05. price"]), 2)
         stock_val = {"price": price, "symbol": symbol}
-        fig = display_candlestick('slider', symbol)
 
-        return [stock_val, fig]
+        return stock_val
 
     except (KeyError, IndexError, requests.RequestException, ValueError):
         return None
@@ -91,11 +90,24 @@ def display_candlestick(value, symbol):
     ))
 
     fig.update_layout(
-        xaxis_rangeslider_visible='slider' in value
+        xaxis_rangeslider_visible='slider' in value,
+        title=dict(
+            text=f"{symbol} Stock Chart", 
+            font=dict(color="#00acc2", size=20, weight="bold")  # Bold, #00acc2, size 20
+        ),
+        xaxis=dict(
+            title=dict(text="Date", font=dict(color="#00acc2", size=16)),  # Bold X label
+            tickfont=dict(color="#00acc2", size=14)  # X-axis tick labels
+        ),
+        yaxis=dict(
+            title=dict(text="Price", font=dict(color="#00acc2", size=16)),  # Bold Y label
+            tickfont=dict(color="#00acc2", size=14)  # Y-axis tick labels
+        ),
+        font=dict(color="#00acc2", size=14),  # Default text settings (legend, tooltips)
+        paper_bgcolor="black",  # Outer background
     )
 
     return fig
 
 def usd(value):
-    """Format value as USD."""
     return f"${value:,.2f}"

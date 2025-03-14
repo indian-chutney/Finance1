@@ -3,7 +3,7 @@ from flask import Flask, flash, redirect, render_template, request, session
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from helpers import apology, login_required, lookup, usd
+from helpers import apology, login_required, lookup, usd, display_candlestick
 
 # Configure application
 app = Flask(__name__)
@@ -36,6 +36,7 @@ def index():
 
     user_id = session["user_id"]
     table = db.execute("SELECT stock_name, no_of_stocks FROM stocks_owned WHERE id = ?", user_id)
+    print(table)
 
     cash = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])
 
@@ -195,10 +196,10 @@ def quote():
             return apology("provide a symbol", 400)
         symbol = request.form.get("symbol")
         stocks = lookup(symbol)
-        fig = stocks[1].to_html(full_html=False)
+        fig = display_candlestick('slider', symbol).to_html(full_html=False, config={'displayModeBar': False})
         if not stocks:
             return apology("invalid symbol", 400)
-        return render_template("quoted.html", stocks=stocks[0], fig = fig)
+        return render_template("quoted.html", stocks = stocks, fig = fig)
     else:
         return render_template("quote.html")
 

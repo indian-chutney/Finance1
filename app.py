@@ -1,7 +1,10 @@
-import sqlite3
 import os
+import datetime
+
 from flask import Flask, flash, redirect, render_template, request, session
 from dotenv import load_dotenv
+from pymongo import MongoClient
+from bson.objectid import ObjectId
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -20,6 +23,10 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
+# Connecting MongoDb database
+client = MongoClient(os.getenv("mongodb_conn_str"))
+db = client.finance
+
 @app.after_request
 def after_request(response):
     """Ensure responses aren't cached"""
@@ -33,43 +40,39 @@ def after_request(response):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
 
     user_id = session["user_id"]
-    cursor.execute("SELECT stock_name, no_of_stocks FROM stocks_owned WHERE id = ?", (user_id,))
-    table = cursor.fetchall()
+    
+    stocks_owned_cursor = db.stocks_owned.find({"user_id": user_id})
+    stocks_owned = list(stocks_owned_cursor)
 
-    cursor.execute("SELECT cash FROM users WHERE id = ?", (session["user_id"],))
-    cash = cursor.fetchone()
-    conn.close()
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    cash = user["cash"] if user else 10000.0
 
-    if not table:
-        return render_template("index.html", stocks_owned=[], Cash=cash[0], Total=cash[0])
+    if not stocks_owned:
+        return render_template("index.html", stocks_owned=[], Cash=cash, Total=cash)
 
-    stocks_owned = []
+    portfolio = []
     grand_total = 0
-    for row in table:
-        stock = lookup(row[0])
+    for stocks in stocks_owned:
+        stock = lookup(stocks["stock_name"])
         cost = float(stock["price"])
-        grand_total = grand_total + cost * float(row[1])
+        grand_total = grand_total + cost * float(stocks["no_of_stocks"])
         transaction = {
-            "stock": row[0],
-            "number of stocks": int(row[1]),
+            "stock": stocks["stock_name"],
+            "number of stocks": int(stocks["no_of_stocks"]),
             "price": cost,
-            "total": round(cost * float(row[1]), 2)
+            "total": round(cost * float(stocks["no_of_stocks"]), 2)
         }
-        stocks_owned.append(transaction)
+        portfolio.append(transaction)
 
-    return render_template("index.html", stocks_owned=stocks_owned, Cash=round(float(cash[0]), 2), Total=round(float(cash[0] + grand_total), 2))
+    return render_template("index.html", stocks_owned=portfolio, Cash=round(float(cash), 2), Total=round(float(cash + grand_total), 2))
 
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
     if request.method == "POST":
-        conn = get_db_connection()
-        cursor = conn.cursor()
         if not request.form.get("symbol"):
             return apology("provide a symbol", 400)
 
@@ -90,22 +93,37 @@ def buy():
             return apology("enter a valid number", 400)
 
         user_id = session["user_id"]
-
-        cursor.execute("SELECT cash FROM users WHERE id = ?", (user_id,))
-        cash = float(cursor.fetchone()[0])
+        user = db.users.find_one({"_id" : ObjectId(user_id)})
+        cash = float(user["cash"])
 
         cost = stock_no * float(stocks["price"])
 
         if cost > cash:
             return apology("you don't have sufficient funds", 400)
+        
+        # insert into transactions
+        db.transactions.insert_one({
+            "user_id" : ObjectId(user_id),
+            "stock_name" : stocks["symbol"],
+            "no_of_stocks" : stock_no,
+            "price" : stocks["price"],
+            "time" : datetime.datetime.now()
+        })
 
-        cursor.execute("INSERT INTO transactions(id, stock_name, no_of_stocks, price) VALUES(?, ?, ?, ?)", (user_id, stocks["symbol"], stock_no, float(stocks["price"])))
-        cursor.execute("UPDATE users SET cash = ? WHERE id = ?", (cash - cost, user_id))
-        cursor.execute("INSERT INTO stocks_owned (id, stock_name, no_of_stocks) VALUES (?, ?, ?) ON CONFLICT(id, stock_name) DO UPDATE SET no_of_stocks = no_of_stocks + excluded.no_of_stocks", (user_id, stocks["symbol"], stock_no))
-        conn.commit()
+        # update user's cash
+        db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"cash": cash - cost}}
+        )
+
+        # inserting ito stocks_owned
+        db.stocks_owned.update_one(
+            {"user_id": user_id, "stock_name": stocks["symbol"]},
+            {"$inc": {"no_of_stocks": stock_no}},
+            upsert=True
+        )
 
         flash("Stock Bought successfully!", "success")
-        conn.close()
 
         return redirect("/")
 
@@ -116,20 +134,16 @@ def buy():
 @app.route("/history")
 @login_required
 def history():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    user_id = session["user_id"]
 
-    cursor.execute("SELECT stock_name, no_of_stocks, price, time FROM transactions WHERE id = ?", (session["user_id"],))
-    table = cursor.fetchall()
+    stocks_transacted = list(db.transactions.find({"user_id" : ObjectId(user_id)}))
 
     transactions = [{
-        "symbol": row[0],
-        "number of stocks": row[1],
-        "price": row[2],
-        "time": row[3]
-    } for row in table]
-
-    conn.close()
+        "symbol": stock["stock_name"],
+        "number of stocks": stock["no_of_stocks"],
+        "price": stock["price"],
+        "time": stock["time"]
+    } for stock in stocks_transacted]
 
     return render_template("history.html", transactions=transactions)
 
@@ -152,21 +166,18 @@ def login():
             return apology("must provide password", 400)
 
         # Query database for username
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        
         username = request.form.get("username")
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-        row = cursor.fetchone()
+        user = db.users.find_one({"username" : username})
 
         # Ensure username exists and password is correct
-        if row is None or not check_password_hash(row[2], request.form.get("password")): 
+        if user is None or not check_password_hash(user["hash"], request.form.get("password")): 
             return apology("invalid username and/or password", 400)
 
         # Remember which user has logged in
-        session["user_id"] = row[0]
+        session["user_id"] = user["_id"]
 
         flash("Logged in successfully!", "success")
-        conn.close()
 
         # Redirect user to home page
         return redirect("/")
@@ -218,12 +229,9 @@ def register():
         if not request.form.get("password"):
             return apology("must provide password", 400)
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
         # ensuring if same username exists or not
         username = request.form.get("username")
-        cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
-        if cursor.fetchone():
+        if db.users.find_one({"username" : username}):
             return apology("username already exists", 400)
 
         password = request.form.get("password")
@@ -237,13 +245,16 @@ def register():
         if password != confirm:
             return apology("input same password in confirm password", 400)
 
-        cursor.execute("INSERT INTO users(username, hash) VALUES(?, ?)", (username, generate_password_hash(password)))
-        conn.commit()
-        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
-        session["user_id"] = cursor.fetchone()[0]
+        db.users.insert_one({
+            "username" : username,
+            "hash" : generate_password_hash(password),
+            "cash" : 10000.00
+        })
+
+        user = db.users.find_one({"username" : username})
+        session["user_id"] = user["_id"]
 
         flash("Registered successfully!", "success")
-        conn.close()
 
         return redirect("/")
 
@@ -259,29 +270,34 @@ def sell():
         stock = request.form.get("symbol")
         number = int(request.form.get("shares"))
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        stock_val = db.stocks_owned.find_one({"user_id" : session["user_id"], "stock_name" : stock})
 
-        cursor.execute("SELECT no_of_stocks FROM stocks_owned WHERE stock_name = ? AND id = ?", (stock, session["user_id"]))
-        row = cursor.fetchone()
-
-        if row[0] < number:
+        if stock_val["no_of_stocks"] < number:
             return apology("you don't have sufficient stocks", 400)
 
         value = lookup(stock)
 
-        cursor.execute("INSERT INTO transactions(id, stock_name, no_of_stocks, price) VALUES(?, ?, ?, ?)", (session["user_id"], stock, -number, float(value["price"])))
-        cursor.execute("UPDATE users SET cash = cash + ? WHERE id = ?", (number * float(value["price"]), session["user_id"]))
-        conn.commit()
+        db.transactions.insert_one({"user_id" : session["user_id"], "stock_name" : stock, "no_of_stocks" : -number, "price" : float(value["price"])})
+
+        db.users.update_one(
+            {"_id" : session["user_id"]},
+            {"$inc": {"cash": number * float(value["price"])}}
+        )
+
+        if stock_val["no_of_stocks"] == number:
+            db.stocks_owned.delete_one({"user_id": session["user_id"], "stock_name": stock})
+        else:
+            db.stocks_owned.update_one(
+                {"user_id": session["user_id"], "stock_name": stock},
+                {"$inc": {"no_of_stocks": -number}}
+            )
 
         flash("Stocks sold successfully!", "success")
 
-        conn.close()
-
         return redirect("/")
     else:
-        cursor.execute("SELECT stock_name FROM stocks_owned WHERE id = ?", (session["user_id"],))
-        stock_names = [row[0] for row in cursor.fetchall()]
+        stock_val = db.stocks_owned.find({"user_id" : session["user_id"]})
+        stock_names = [stock["stock_name"] for stock in stock_val]
 
         return render_template("sell.html", options=stock_names)
 
@@ -297,34 +313,24 @@ def change_password():
 
         if not password or not new_password or not confirmation:
             return apology("enter the password/passwords", 400)
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
 
-        cursor.execute("SELECT hash FROM users WHERE id = ?", (session["user_id"],))
-        pass_hash = cursor.fetchone()
+        user = db.users.find_one({"_id" : session["user_id"]})
+        pass_hash = user["hash"]
 
-        if not pass_hash or not check_password_hash(pass_hash[0], password):  
+        if not pass_hash or not check_password_hash(pass_hash, password):  
             return apology("The password is incorrect", 400)
 
         if new_password != confirmation:
             return apology("The passwords are not the same", 400)
 
-        cursor.execute("UPDATE users SET hash = ? WHERE id = ?", 
-                       (generate_password_hash(new_password), session["user_id"]))
-        conn.commit()
+        db.users.update(
+            {"_id" : user["_id"]},
+            {"$set" : {"hash" : generate_password_hash(new_password)}}
+        )
 
         flash("Password updated successfully!", "success")
-
-        conn.close()
 
         return redirect("/")
 
     else:
         return render_template("change.html")
-
-
-def get_db_connection():
-    conn = sqlite3.connect("finance.db")
-    conn.row_factory = sqlite3.Row
-    return conn

@@ -158,7 +158,7 @@ def history():
         "time": stock["time"]
     } for stock in stocks_transacted]
 
-    return render_template("history.html", transactions=transactions)
+    return render_template("history.html", transactions=transactions.reverse())
 
 # route handler for getting stock data from api
 @app.route("/quote", methods=["GET", "POST"])

@@ -89,8 +89,8 @@ Stock price data is visualized using candlestick charts, which show opening, clo
 
 1. Clone the repository
    ```
-   git clone https://github.com/yourusername/finance1.git
-   cd finance1
+   git clone https://github.com/indian-chutney/Finance1.git
+   cd Finance1
    ```
 
 2. Install dependencies

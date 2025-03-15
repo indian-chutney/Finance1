@@ -173,16 +173,19 @@ def quote():
         symbol = request.form.get("symbol")
 
         # fetching current price of stock
-        stocks = lookup(symbol)
+        try:
+            stocks = lookup(symbol)
 
-        # fetching data of last 100 days from api and generating candlestick graph 
-        fig = display_candlestick('slider', symbol).to_html(full_html=False, config={'displayModeBar': False})
+            # fetching data of last 100 days from api and generating candlestick graph 
+            fig = display_candlestick('slider', symbol).to_html(full_html=False, config={'displayModeBar': False})
 
-        if not stocks:
-            return apology("invalid symbol", 400)
-        
-        # rendering graph and table
-        return render_template("quoted.html", stocks = stocks, fig = fig)
+            if not stocks:
+                return apology("invalid symbol", 400)
+            
+            # rendering graph and table
+            return render_template("quoted.html", stocks = stocks, fig = fig)
+        except:
+            return apology("Invalid Stock Symbol", 400)
     
     else:
         return render_template("quote.html")
@@ -209,6 +212,9 @@ def sell():
         stock = request.form.get("symbol")
         number = int(request.form.get("shares"))
 
+        if number <= 0:
+            return apology("Enter Valid Number", 400)
+
         # fetching user's stocks
         stock_val = db.stocks_owned.find_one({"user_id" : session["user_id"], "stock_name" : stock})
 
@@ -216,29 +222,32 @@ def sell():
             return apology("you don't have sufficient stocks", 400)
 
         # fetching current price of given stock
-        value = lookup(stock)
+        try:
+            value = lookup(stock)
 
-        # inserting stock sold into transactions collection
-        db.transactions.insert_one({"user_id" : session["user_id"], "stock_name" : stock, "no_of_stocks" : -number, "price" : float(value["price"])})
+            # inserting stock sold into transactions collection
+            db.transactions.insert_one({"user_id" : ObjectId(session["user_id"]), "stock_name" : stock, "no_of_stocks" : -number, "price" : float(value["price"]), "time" : datetime.datetime.now()})
 
-        # updating user's balance
-        db.users.update_one(
-            {"_id" : session["user_id"]},
-            {"$inc": {"cash": number * float(value["price"])}}
-        )
-
-        # updating value of stocks owned by user
-        if stock_val["no_of_stocks"] == number:
-            db.stocks_owned.delete_one({"user_id": session["user_id"], "stock_name": stock})
-        else:
-            db.stocks_owned.update_one(
-                {"user_id": session["user_id"], "stock_name": stock},
-                {"$inc": {"no_of_stocks": -number}}
+            # updating user's balance
+            db.users.update_one(
+                {"_id" : ObjectId(session["user_id"])},
+                {"$inc": {"cash": number * float(value["price"])}}
             )
 
-        flash("Stocks sold successfully!", "success")
+            # updating value of stocks owned by user
+            if stock_val["no_of_stocks"] == number:
+                db.stocks_owned.delete_one({"user_id": session["user_id"], "stock_name": stock})
+            else:
+                db.stocks_owned.update_one(
+                    {"user_id": ObjectId(session["user_id"]), "stock_name": stock},
+                    {"$inc": {"no_of_stocks": -number}}
+                )
 
-        return redirect("/")
+            flash("Stocks sold successfully!", "success")
+
+            return redirect("/")
+        except:
+            return apology("Invalid Stock Symbol", 400)
     else:
         stock_val = db.stocks_owned.find({"user_id" : session["user_id"]})
         stock_names = [stock["stock_name"] for stock in stock_val]

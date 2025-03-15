@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from flask import redirect, render_template, session
 from functools import wraps
 
-
+# function to render error message on website
 def apology(message, code=400):
 
     def escape(s):
@@ -28,7 +28,7 @@ def apology(message, code=400):
 
     return render_template("apology.html", top=code, bottom=escape(message)), code
 
-
+# wrapper function for implementing login required
 def login_required(f):
 
     # referece -> https://flask.palletsprojects.com/en/latest/patterns/viewdecorators/
@@ -41,7 +41,7 @@ def login_required(f):
 
     return decorated_function
 
-
+# function to get current price of stock from api
 def lookup(symbol):
 
     load_dotenv()
@@ -68,9 +68,11 @@ def lookup(symbol):
         return None
 
 
-# reference -> https://plotly.com/python/candlestick-charts/
+# function to generate candlestick graph on website
 def display_candlestick(value, symbol):
+
     try:
+        # reference -> https://plotly.com/python/candlestick-charts/
         response = requests.get(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=compact&apikey=C5S6C4ETI117KFZR")
         response.raise_for_status()
 
@@ -106,18 +108,18 @@ def display_candlestick(value, symbol):
         xaxis_rangeslider_visible='slider' in value,
         title=dict(
             text=f"{symbol} Stock Chart", 
-            font=dict(color="#00acc2", size=20, weight="bold")  # Bold, #00acc2, size 20
+            font=dict(color="#00acc2", size=20, weight="bold") 
         ),
         xaxis=dict(
-            title=dict(text="Date", font=dict(color="#00acc2", size=16)),  # Bold X label
-            tickfont=dict(color="#00acc2", size=14)  # X-axis tick labels
+            title=dict(text="Date", font=dict(color="#00acc2", size=16)),  
+            tickfont=dict(color="#00acc2", size=14) 
         ),
         yaxis=dict(
-            title=dict(text="Price", font=dict(color="#00acc2", size=16)),  # Bold Y label
-            tickfont=dict(color="#00acc2", size=14)  # Y-axis tick labels
+            title=dict(text="Price", font=dict(color="#00acc2", size=16)),  
+            tickfont=dict(color="#00acc2", size=14)  
         ),
-        font=dict(color="#00acc2", size=14),  # Default text settings (legend, tooltips)
-        paper_bgcolor="black",  # Outer background
+        font=dict(color="#00acc2", size=14),  
+        paper_bgcolor="black",  
     )
 
     return fig

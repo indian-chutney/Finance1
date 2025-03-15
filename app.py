@@ -50,7 +50,7 @@ def index():
     user_id = session["user_id"]
     
     # fetching stocks owned by user from db
-    stocks_owned_cursor = db.stocks_owned.find({"user_id": user_id})
+    stocks_owned_cursor = db.stocks_owned.find({"user_id": ObjectId(user_id)})
     stocks_owned = list(stocks_owned_cursor)
 
     user = db.users.find_one({"_id": ObjectId(user_id)})
@@ -129,7 +129,7 @@ def buy():
 
         # inserting into stocks_owned
         db.stocks_owned.update_one(
-            {"user_id": user_id, "stock_name": stocks["symbol"]},
+            {"user_id": ObjectId(user_id), "stock_name": stocks["symbol"]},
             {"$inc": {"no_of_stocks": stock_no}},
             upsert=True
         )
@@ -216,7 +216,7 @@ def sell():
             return apology("Enter Valid Number", 400)
 
         # fetching user's stocks
-        stock_val = db.stocks_owned.find_one({"user_id" : session["user_id"], "stock_name" : stock})
+        stock_val = db.stocks_owned.find_one({"user_id" : ObjectId(session["user_id"]), "stock_name" : stock})
 
         if stock_val["no_of_stocks"] < number:
             return apology("you don't have sufficient stocks", 400)
@@ -236,11 +236,11 @@ def sell():
 
             # updating value of stocks owned by user
             if stock_val["no_of_stocks"] == number:
-                db.stocks_owned.delete_one({"user_id": session["user_id"], "stock_name": stock})
+                db.stocks_owned.delete_one({"user_id": ObjectId(session["user_id"]), "stock_name": stock})
             else:
                 db.stocks_owned.update_one(
                     {"user_id": ObjectId(session["user_id"]), "stock_name": stock},
-                    {"$inc": {"no_of_stocks": -number}}
+                    {"$set": {"no_of_stocks": stock_val["no_of_stocks"]-number}}
                 )
 
             flash("Stocks sold successfully!", "success")
@@ -249,7 +249,7 @@ def sell():
         except:
             return apology("Invalid Stock Symbol", 400)
     else:
-        stock_val = db.stocks_owned.find({"user_id" : session["user_id"]})
+        stock_val = db.stocks_owned.find({"user_id" : ObjectId(session["user_id"])})
         stock_names = [stock["stock_name"] for stock in stock_val]
 
         # rendering stocks owned in options bar
@@ -270,7 +270,7 @@ def change_password():
             return apology("enter the password/passwords", 400)
 
         # fetching user's data
-        user = db.users.find_one({"_id" : session["user_id"]})
+        user = db.users.find_one({"_id" : ObjectId(session["user_id"])})
         pass_hash = user["hash"]
 
         # check if hash of user's password is same as given

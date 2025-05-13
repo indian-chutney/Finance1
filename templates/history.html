@@ -18,7 +18,7 @@
         {% for transaction in transactions %}
             <tr>
                 <td>{{ transaction["symbol"] }}</td>
-                <td>{{ transaction["number of stocks"] }}</td>
+                <td>{{ transaction["no_of_stocks"] }}</td>
                 <td>{{ transaction["price"] | usd}}</td>
                 <td>{{ transaction["time"] }}</td>
             </tr>
